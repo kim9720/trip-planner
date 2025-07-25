@@ -1,155 +1,173 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import TripForm from './components/TripForm';
 import MapDisplay from './components/MapDisplay';
 import LogSheet from './components/LogSheet';
-import { FiHome, FiMap, FiClock, FiSettings, FiTruck } from 'react-icons/fi';
+import AllTrips from './components/AllTrips';
+import { FiHome, FiMap, FiClock, FiSettings, FiTruck, FiMapPin } from 'react-icons/fi';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import './App.css'; // Create this file for custom styles
+import './App.css';
 
 const App = () => {
   const [tripData, setTripData] = useState(null);
   const [logs, setLogs] = useState([]);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState('plan');
-  const [showSplash, setShowSplash] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
+  const [activeSection, setActiveSection] = useState('plan');
+  const [showSplashScreen, setShowSplashScreen] = useState(true);
+  const [theme, setTheme] = useState('light');
 
-  // Mock data for testing
-  const mockTripData = {
-    current_location: [40.7128, -74.0060], // New York
-    pickup_location: [34.0522, -118.2437], // Los Angeles
-    dropoff_location: [41.8781, -87.6298], // Chicago
-  };
-  const mockLogs = [
-    {
-      date: '2025-07-24',
-      driving_hours: 10,
-      on_duty_hours: 12,
-      off_duty_hours: 12,
-      fueling_stops: 1,
-      status_log: [
-        ['2025-07-24T00:00:00', 'Off-Duty'],
-        ['2025-07-24T01:00:00', 'On-Duty'],
-        ['2025-07-24T11:00:00', 'Driving'],
-        ['2025-07-24T12:00:00', 'Off-Duty'],
-      ],
-    },
-  ];
-
-  // Hide splash screen after 2 seconds
   useEffect(() => {
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    tooltipTriggerList.forEach((tooltipTriggerEl) => {
+      new window.bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
     const timer = setTimeout(() => {
-      setShowSplash(false);
-    }, 2000);
+      setShowSplashScreen(false);
+    }, 3000);
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    const handleResize = () => {
+      setIsSidebarOpen(window.innerWidth > 768);
+    };
+    window.addEventListener('resize', handleResize);
+    handleResize();
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const handleSubmit = async (formData) => {
-    setLoading(true);
-    setError(null);
+    setIsLoading(true);
+    setError('');
+    setSuccess(false);
     try {
-      // Mock API call
-      setTimeout(() => {
-        setTripData(mockTripData);
-        setLogs(mockLogs);
-        setLoading(false);
-        setActiveTab('results');
-      }, 1000);
+      const response = await axios.post('https://trip.uwamaatraders.com/api/trips/', {
+        driver_id: formData.driver_id,
+        current_location_lat: formData.current_location[0],
+        current_location_lng: formData.current_location[1],
+        pickup_location_lat: formData.pickup_location[0],
+        pickup_location_lng: formData.pickup_location[1],
+        dropoff_location_lat: formData.dropoff_location[0],
+        dropoff_location_lng: formData.dropoff_location[1],
+        current_cycle_hours: formData.current_cycle_hours,
+      });
+      setTripData(response.data.trip);
+      setLogs(response.data.logs);
+      setSuccess(true);
+      setActiveSection('results');
+      setIsLoading(false);
     } catch (error) {
-      setError('Failed to plan trip. Please try again.');
-      setLoading(false);
-      setTripData(mockTripData);
-      setLogs(mockLogs);
-      setActiveTab('results');
+      setError(error.response?.data?.error || 'Failed to plan trip. Please try again.');
+      setIsLoading(false);
     }
+  };
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    document.body.setAttribute('data-theme', newTheme);
+  };
+
+  const handleAllTripsError = (errorMsg) => {
+    setError(errorMsg);
   };
 
   return (
     <>
-      {/* Splash Screen */}
-      {showSplash && (
+      {showSplashScreen && (
         <div className="splash-screen">
           <div className="splash-content">
             <FiTruck className="splash-icon" size={64} />
             <h1 className="splash-title">Trip Planner</h1>
-            <div className="spinner-border text-primary" role="status">
+            <div className="spinner-border text-light" role="status">
               <span className="visually-hidden">Loading...</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* Main App */}
-      <div className={`app-container ${showSplash ? 'd-none' : 'd-flex'}`}>
-        {/* Sidebar */}
-        <div 
-          className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}
-        >
+      <div className={`app-container ${showSplashScreen ? 'd-none' : 'd-flex'}`}>
+        <div className={`sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
           <div className="sidebar-header">
-            {sidebarOpen ? (
-              <h4 className="m-0 text-primary">Trip Planner</h4>
+            {isSidebarOpen ? (
+              <h3 className="m-0 text-primary">Trip Planner</h3>
             ) : (
-              <FiTruck className="text-primary" size={24} />
+              <FiTruck className="text-primary" size={30} />
             )}
-            <button 
+            <button
               className="sidebar-toggle"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              title={isSidebarOpen ? 'Collapse' : 'Expand'}
             >
-              {sidebarOpen ? '◀' : '▶'}
+              {isSidebarOpen ? '◄' : '►'}
             </button>
           </div>
           <nav className="sidebar-nav">
-            <button 
-              className={`nav-link ${activeTab === 'plan' ? 'active' : ''}`}
-              onClick={() => setActiveTab('plan')}
+            <button
+              className={`nav-link ${activeSection === 'plan' ? 'active' : ''}`}
+              onClick={() => setActiveSection('plan')}
+              title="Plan a new trip"
             >
               <FiHome className="nav-icon" />
-              {sidebarOpen && 'Plan Trip'}
+              {isSidebarOpen && <span>Plan Trip</span>}
             </button>
-            <button 
-              className={`nav-link ${activeTab === 'results' ? 'active' : ''}`}
-              onClick={() => setActiveTab('results')}
+            <button
+              className={`nav-link ${activeSection === 'results' ? 'active' : ''}`}
+              onClick={() => setActiveSection('results')}
               disabled={!tripData}
+              title="View trip map"
             >
               <FiMap className="nav-icon" />
-              {sidebarOpen && 'Trip Results'}
+              {isSidebarOpen && <span>Trip Results</span>}
             </button>
-            <button 
-              className={`nav-link ${activeTab === 'logs' ? 'active' : ''}`}
-              onClick={() => setActiveTab('logs')}
+            <button
+              className={`nav-link ${activeSection === 'logs' ? 'active' : ''}`}
+              onClick={() => setActiveSection('logs')}
               disabled={logs.length === 0}
+              title="View driver logs"
             >
               <FiClock className="nav-icon" />
-              {sidebarOpen && 'Driver Logs'}
+              {isSidebarOpen && <span>Driver Logs</span>}
             </button>
-            <button 
-              className={`nav-link ${activeTab === 'settings' ? 'active' : ''}`}
-              onClick={() => setActiveTab('settings')}
+            <button
+              className={`nav-link ${activeSection === 'all-trips' ? 'active' : ''}`}
+              onClick={() => setActiveSection('all-trips')}
+              title="View all trips for a driver"
+            >
+              <FiMapPin className="nav-icon" />
+              {isSidebarOpen && <span>All Trips</span>}
+            </button>
+            <button
+              className={`nav-link ${activeSection === 'settings' ? 'active' : ''}`}
+              onClick={() => setActiveSection('settings')}
+              title="Adjust settings"
             >
               <FiSettings className="nav-icon" />
-              {sidebarOpen && 'Settings'}
+              {isSidebarOpen && <span>Settings</span>}
             </button>
           </nav>
         </div>
 
-        {/* Main Content */}
         <div className="main-content">
           <div className="container-fluid py-4">
-            {activeTab === 'plan' && (
+            {activeSection === 'plan' && (
               <div className="fade-in">
                 <h1 className="display-5 mb-4 text-primary">Plan Your Route</h1>
-                <TripForm onSubmit={handleSubmit} loading={loading} />
+                <TripForm onSubmit={handleSubmit} loading={isLoading} />
               </div>
             )}
 
-            {activeTab === 'results' && tripData && (
+            {activeSection === 'results' && tripData && (
               <div className="fade-in">
                 <div className="d-flex justify-content-between align-items-center mb-4">
                   <h1 className="display-5 m-0 text-primary">Trip Results</h1>
-                  <button 
+                  <button
                     className="btn btn-outline-primary"
-                    onClick={() => setActiveTab('plan')}
+                    onClick={() => setActiveSection('plan')}
                   >
                     Plan New Trip
                   </button>
@@ -158,13 +176,13 @@ const App = () => {
               </div>
             )}
 
-            {activeTab === 'logs' && logs.length > 0 && (
+            {activeSection === 'logs' && logs.length > 0 && (
               <div className="fade-in">
                 <div className="d-flex justify-content-between align-items-center mb-4">
                   <h1 className="display-5 m-0 text-primary">Driver Logs</h1>
-                  <button 
+                  <button
                     className="btn btn-outline-primary"
-                    onClick={() => setActiveTab('results')}
+                    onClick={() => setActiveSection('results')}
                   >
                     Back to Results
                   </button>
@@ -173,13 +191,48 @@ const App = () => {
               </div>
             )}
 
-            {activeTab === 'settings' && (
+            {activeSection === 'all-trips' && (
+              <div className="fade-in">
+                <AllTrips onError={handleAllTripsError} />
+              </div>
+            )}
+
+            {activeSection === 'settings' && (
               <div className="fade-in">
                 <h1 className="display-5 mb-4 text-primary">Settings</h1>
                 <div className="card shadow-sm">
                   <div className="card-body">
-                    <h5 className="card-title">Application Settings</h5>
-                    <p className="card-text">Configure your preferences here.</p>
+                    <h5 className="card-title">Preferences</h5>
+                    <div className="settings-option">
+                      <span>Theme</span>
+                      <button
+                        className="btn btn-sm btn-outline-primary"
+                        onClick={toggleTheme}
+                      >
+                        Switch to {theme === 'light' ? 'Dark' : 'Light'} Mode
+                      </button>
+                    </div>
+                    <div className="settings-option">
+                      <span>Notifications</span>
+                      <div className="form-check form-switch">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          id="notifications"
+                        />
+                        <label className="form-check-label" htmlFor="notifications">
+                          Enable Notifications
+                        </label>
+                      </div>
+                    </div>
+                    <div className="settings-option">
+                      <span>Map Style</span>
+                      <select className="form-select w-auto">
+                        <option>Standard</option>
+                        <option>Satellite</option>
+                        <option>Dark</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -191,13 +244,55 @@ const App = () => {
                   <div className="modal-content">
                     <div className="modal-header">
                       <h5 className="modal-title">Error</h5>
-                      <button type="button" className="btn-close" onClick={() => setError(null)}></button>
+                      <button
+                        type="button"
+                        className="btn-close"
+                        onClick={() => setError('')}
+                      />
                     </div>
                     <div className="modal-body">
                       <p>{error}</p>
                     </div>
                     <div className="modal-footer">
-                      <button type="button" className="btn btn-secondary" onClick={() => setError(null)}>Close</button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => setError('')}
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {success && (
+              <div className="error-modal">
+                <div className="modal-dialog">
+                  <div className="modal-content">
+                    <div className="modal-header">
+                      <h5 className="modal-title text-success">Success</h5>
+                      <button
+                        type="button"
+                        className="btn-close"
+                        onClick={() => setSuccess(false)}
+                      />
+                    </div>
+                    <div className="modal-body">
+                      <p>Trip planned successfully! Check the results tab.</p>
+                    </div>
+                    <div className="modal-footer">
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => {
+                          setSuccess(false);
+                          setActiveSection('results');
+                        }}
+                      >
+                        View Results
+                      </button>
                     </div>
                   </div>
                 </div>

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { FiInfo } from 'react-icons/fi';
 
 const TripForm = ({ onSubmit, loading }) => {
   const [formData, setFormData] = useState({
+    driver_id: '',
     current_location: '',
     pickup_location: '',
     dropoff_location: '',
@@ -12,6 +14,10 @@ const TripForm = ({ onSubmit, loading }) => {
   const validate = () => {
     const newErrors = {};
     const latLngRegex = /^-?\d+\.\d+,-?\d+\.\d+$/;
+    
+    if (!formData.driver_id.trim()) {
+      newErrors.driver_id = 'Driver ID is required';
+    }
     if (!latLngRegex.test(formData.current_location)) {
       newErrors.current_location = 'Enter valid lat,lng (e.g., 40.7128,-74.0060)';
     }
@@ -36,6 +42,7 @@ const TripForm = ({ onSubmit, loading }) => {
     e.preventDefault();
     if (validate()) {
       const parsedData = {
+        driver_id: formData.driver_id,
         current_location: formData.current_location.split(',').map(Number),
         pickup_location: formData.pickup_location.split(',').map(Number),
         dropoff_location: formData.dropoff_location.split(',').map(Number),
@@ -75,6 +82,39 @@ const TripForm = ({ onSubmit, loading }) => {
         </h2>
         
         <form onSubmit={handleSubmit}>
+          {/* Driver ID Field */}
+          <div className="mb-4">
+            <label className="form-label d-flex align-items-center" style={{
+              color: '#34495e',
+              fontWeight: '500',
+              marginBottom: '0.5rem'
+            }}>
+              Driver ID
+            </label>
+            <input
+              type="text"
+              name="driver_id"
+              value={formData.driver_id}
+              onChange={handleChange}
+              className={`form-control ${errors.driver_id ? 'is-invalid' : ''}`}
+              style={{
+                borderRadius: '8px',
+                padding: '12px 15px',
+                border: '1px solid #dfe6e9',
+                boxShadow: 'none',
+                transition: 'all 0.3s',
+                fontSize: '0.95rem'
+              }}
+              placeholder="e.g., 98780"
+              required
+            />
+            {errors.driver_id && (
+              <div className="invalid-feedback d-flex align-items-center mt-1">
+                {errors.driver_id}
+              </div>
+            )}
+          </div>
+
           {/* Current Location Field */}
           <div className="mb-4">
             <label className="form-label d-flex align-items-center" style={{
@@ -83,24 +123,13 @@ const TripForm = ({ onSubmit, loading }) => {
               marginBottom: '0.5rem'
             }}>
               Current Location (lat,lng)
-              <span
+              <FiInfo
                 className="ms-2"
+                size={16}
                 data-bs-toggle="tooltip"
                 data-bs-placement="top"
                 title="Enter latitude and longitude, e.g., 40.7128,-74.0060"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  fill="#3498db"
-                  className="bi bi-info-circle"
-                  viewBox="0 0 16 16"
-                >
-                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
-                  <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
-                </svg>
-              </span>
+              />
             </label>
             <input
               type="text"
@@ -121,17 +150,6 @@ const TripForm = ({ onSubmit, loading }) => {
             />
             {errors.current_location && (
               <div className="invalid-feedback d-flex align-items-center mt-1">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  fill="#e74c3c"
-                  className="bi bi-exclamation-circle me-1"
-                  viewBox="0 0 16 16"
-                >
-                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
-                  <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z"/>
-                </svg>
                 {errors.current_location}
               </div>
             )}
@@ -145,24 +163,13 @@ const TripForm = ({ onSubmit, loading }) => {
               marginBottom: '0.5rem'
             }}>
               Pickup Location (lat,lng)
-              <span
+              <FiInfo
                 className="ms-2"
+                size={16}
                 data-bs-toggle="tooltip"
                 data-bs-placement="top"
-                title="Enter latitude and longitude"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  fill="#3498db"
-                  className="bi bi-info-circle"
-                  viewBox="0 0 16 16"
-                >
-                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
-                  <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
-                </svg>
-              </span>
+                title="Enter latitude and longitude, e.g., 34.0522,-118.2437"
+              />
             </label>
             <input
               type="text"
@@ -183,17 +190,6 @@ const TripForm = ({ onSubmit, loading }) => {
             />
             {errors.pickup_location && (
               <div className="invalid-feedback d-flex align-items-center mt-1">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  fill="#e74c3c"
-                  className="bi bi-exclamation-circle me-1"
-                  viewBox="0 0 16 16"
-                >
-                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
-                  <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z"/>
-                </svg>
                 {errors.pickup_location}
               </div>
             )}
@@ -207,24 +203,13 @@ const TripForm = ({ onSubmit, loading }) => {
               marginBottom: '0.5rem'
             }}>
               Dropoff Location (lat,lng)
-              <span
+              <FiInfo
                 className="ms-2"
+                size={16}
                 data-bs-toggle="tooltip"
                 data-bs-placement="top"
-                title="Enter latitude and longitude"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  fill="#3498db"
-                  className="bi bi-info-circle"
-                  viewBox="0 0 16 16"
-                >
-                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
-                  <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
-                </svg>
-              </span>
+                title="Enter latitude and longitude, e.g., 41.8781,-87.6298"
+              />
             </label>
             <input
               type="text"
@@ -245,17 +230,6 @@ const TripForm = ({ onSubmit, loading }) => {
             />
             {errors.dropoff_location && (
               <div className="invalid-feedback d-flex align-items-center mt-1">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  fill="#e74c3c"
-                  className="bi bi-exclamation-circle me-1"
-                  viewBox="0 0 16 16"
-                >
-                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
-                  <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z"/>
-                </svg>
                 {errors.dropoff_location}
               </div>
             )}
@@ -292,17 +266,6 @@ const TripForm = ({ onSubmit, loading }) => {
             <div className="form-text">Enter hours between 0 and 70</div>
             {errors.current_cycle_hours && (
               <div className="invalid-feedback d-flex align-items-center mt-1">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  fill="#e74c3c"
-                  className="bi bi-exclamation-circle me-1"
-                  viewBox="0 0 16 16"
-                >
-                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
-                  <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z"/>
-                </svg>
                 {errors.current_cycle_hours}
               </div>
             )}

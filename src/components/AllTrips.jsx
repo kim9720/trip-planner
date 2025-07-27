@@ -1,10 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine';
-import { FiInfo, FiMapPin } from 'react-icons/fi';
+import { FiInfo, FiMapPin, FiMap } from 'react-icons/fi';
 import LogSheet from './LogSheet';
+
+// Fix for default marker icons
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+// CSS import - use CDN if this doesn't work
+import 'leaflet/dist/leaflet.css';
+
+// Set up Leaflet marker icons
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
 
 const AllTrips = ({ onError }) => {
   const [driverId, setDriverId] = useState('');
@@ -12,12 +31,26 @@ const AllTrips = ({ onError }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [expandedTrip, setExpandedTrip] = useState(null);
+  const [showMapId, setShowMapId] = useState(null);
+  const [mapInstances, setMapInstances] = useState({});
 
   useEffect(() => {
-    if (!trips.length) return;
+    return () => {
+      // Cleanup all maps when component unmounts
+      Object.values(mapInstances).forEach(map => {
+        if (map) map.remove();
+      });
+    };
+  }, [mapInstances]);
 
-    const map = L.map('all-trips-map', {
-      zoomControl: false,
+  const initializeMap = (trip, index) => {
+    const mapId = `trip-map-${trip.id}`;
+    const mapContainer = document.getElementById(mapId);
+    
+    if (!mapContainer || mapContainer._leaflet_map) return;
+
+    const map = L.map(mapId, {
+      zoomControl: true,
       fadeAnimation: true,
       zoomAnimation: true,
     });
@@ -28,85 +61,87 @@ const AllTrips = ({ onError }) => {
       maxZoom: 19,
     }).addTo(map);
 
-    L.control.zoom({ position: 'topright' }).addTo(map);
+    const color = ['#4e73df', '#1cc88a', '#e74a3b'][index % 3];
 
-    const bounds = L.latLngBounds(trips.flatMap(trip => [
+    // Add markers with custom icons
+    const createCustomIcon = (label) => {
+      return L.divIcon({
+        className: 'custom-marker',
+        html: `<div style="background:${color};width:32px;height:32px;border-radius:50%;border:3px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:12px;transform:translate(-50%,-50%)">${label}</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+      });
+    };
+
+    L.marker(trip.current_location, {
+      icon: createCustomIcon('S')
+    }).addTo(map).bindPopup(`
+      <div style="font-weight:bold;color:${color}">Start Location</div>
+      <div>Lat: ${trip.current_location[0].toFixed(4)}</div>
+      <div>Lng: ${trip.current_location[1].toFixed(4)}</div>
+    `);
+
+    L.marker(trip.pickup_location, {
+      icon: createCustomIcon('P')
+    }).addTo(map).bindPopup(`
+      <div style="font-weight:bold;color:${color}">Pickup Location</div>
+      <div>Lat: ${trip.pickup_location[0].toFixed(4)}</div>
+      <div>Lng: ${trip.pickup_location[1].toFixed(4)}</div>
+    `);
+
+    L.marker(trip.dropoff_location, {
+      icon: createCustomIcon('D')
+    }).addTo(map).bindPopup(`
+      <div style="font-weight:bold;color:${color}">Dropoff Location</div>
+      <div>Lat: ${trip.dropoff_location[0].toFixed(4)}</div>
+      <div>Lng: ${trip.dropoff_location[1].toFixed(4)}</div>
+    `);
+
+    // Add route
+    L.Routing.control({
+      waypoints: [
+        L.latLng(trip.current_location[0], trip.current_location[1]),
+        L.latLng(trip.pickup_location[0], trip.pickup_location[1]),
+        L.latLng(trip.dropoff_location[0], trip.dropoff_location[1]),
+      ],
+      routeWhileDragging: false,
+      lineOptions: { 
+        styles: [{ 
+          color, 
+          weight: 5, 
+          opacity: 0.8,
+          dashArray: '0',
+          lineCap: 'round'
+        }] 
+      },
+      show: false,
+      addWaypoints: false,
+      fitSelectedRoutes: 'smart',
+    }).addTo(map);
+
+    // Fit bounds to show all points
+    const bounds = L.latLngBounds([
       trip.current_location,
       trip.pickup_location,
-      trip.dropoff_location,
-    ]));
+      trip.dropoff_location
+    ]);
     map.fitBounds(bounds, { padding: [50, 50] });
 
-    trips.forEach((trip, index) => {
-      const color = ['#4e73df', '#1cc88a', '#e74a3b'][index % 3];
-      L.marker(trip.current_location, {
-        icon: L.divIcon({
-          className: 'custom-marker',
-          html: `<div style="background:${color};width:32px;height:32px;border-radius:50%;border:3px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:12px;transform:translate(-50%,-50%)">S${index + 1}</div>`,
-          iconSize: [32, 32],
-          iconAnchor: [16, 16],
-        }),
-      }).addTo(map).bindPopup(`Trip ${index + 1}: Start (Lat: ${trip.current_location[0].toFixed(4)}, Lng: ${trip.current_location[1].toFixed(4)})`);
+    // Store the map reference
+    setMapInstances(prev => ({ ...prev, [trip.id]: map }));
+  };
 
-      L.marker(trip.pickup_location, {
-        icon: L.divIcon({
-          className: 'custom-marker',
-          html: `<div style="background:${color};width:32px;height:32px;border-radius:50%;border:3px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:12px;transform:translate(-50%,-50%)">P${index + 1}</div>`,
-          iconSize: [32, 32],
-          iconAnchor: [16, 16],
-        }),
-      }).addTo(map).bindPopup(`Trip ${index + 1}: Pickup (Lat: ${trip.pickup_location[0].toFixed(4)}, Lng: ${trip.pickup_location[1].toFixed(4)})`);
-
-      L.marker(trip.dropoff_location, {
-        icon: L.divIcon({
-          className: 'custom-marker',
-          html: `<div style="background:${color};width:32px;height:32px;border-radius:50%;border:3px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:12px;transform:translate(-50%,-50%)">D${index + 1}</div>`,
-          iconSize: [32, 32],
-          iconAnchor: [16, 16],
-        }),
-      }).addTo(map).bindPopup(`Trip ${index + 1}: Dropoff (Lat: ${trip.dropoff_location[0].toFixed(4)}, Lng: ${trip.dropoff_location[1].toFixed(4)})`);
-
-      L.Routing.control({
-        waypoints: [
-          L.latLng(trip.current_location[0], trip.current_location[1]),
-          L.latLng(trip.pickup_location[0], trip.pickup_location[1]),
-          L.latLng(trip.dropoff_location[0], trip.dropoff_location[1]),
-        ],
-        routeWhileDragging: false,
-        lineOptions: { styles: [{ color, weight: 5, opacity: 0.8 }] },
-        show: false,
-        addWaypoints: false,
-        fitSelectedRoutes: false,
-      }).addTo(map);
-    });
-
-    const legend = L.control({ position: 'bottomright' });
-    legend.onAdd = () => {
-      const div = L.DomUtil.create('div', 'legend');
-      div.style.backgroundColor = 'rgba(255,255,255,0.8)';
-      div.style.padding = '10px';
-      div.style.borderRadius = '5px';
-      div.style.boxShadow = '0 0 15px rgba(0,0,0,0.2)';
-      div.style.fontFamily = 'Arial, sans-serif';
-      div.style.fontSize = '12px';
-      div.style.color = '#333';
-      div.innerHTML = `
-        <h4 style="margin:0 0 8px 0;font-size:14px;color:#4e73df">Map Legend</h4>
-        ${trips.map((_, index) => `
-          <div style="display:flex;align-items:center;margin-bottom:5px">
-            <div style="background:${['#4e73df', '#1cc88a', '#e74a3b'][index % 3]};width:12px;height:12px;border-radius:50%;margin-right:8px"></div>
-            <span>Trip ${index + 1}</span>
-          </div>
-        `).join('')}
-      `;
-      return div;
-    };
-    legend.addTo(map);
-
-    return () => {
-      if (map) map.remove();
-    };
-  }, [trips]);
+  const handleShowMap = (tripId, index) => {
+    if (showMapId === tripId) {
+      setShowMapId(null);
+    } else {
+      setShowMapId(tripId);
+      const trip = trips.find(t => t.id === tripId);
+      if (trip && !mapInstances[tripId]) {
+        initializeMap(trip, index);
+      }
+    }
+  };
 
   const handleFetchTrips = async () => {
     if (!driverId.trim()) {
@@ -172,26 +207,27 @@ const AllTrips = ({ onError }) => {
       </div>
 
       {trips.length > 0 && (
-        <>
-          <div className="card shadow-sm mb-4">
-            <div className="card-body">
-              <h5 className="card-title">Trip List</h5>
-              <div className="table-responsive">
-                <table className="table table-hover">
-                  <thead>
-                    <tr>
-                      <th>Trip ID</th>
-                      <th>Created At</th>
-                      <th>Current Location</th>
-                      <th>Pickup Location</th>
-                      <th>Dropoff Location</th>
-                      <th>Cycle Hours</th>
-                      <th>Logs</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {trips.map(trip => (
-                      <tr key={trip.id}>
+        <div className="card shadow-sm">
+          <div className="card-body">
+            <h5 className="card-title mb-4">Trip List</h5>
+            <div className="table-responsive">
+              <table className="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Trip ID</th>
+                    <th>Created At</th>
+                    <th>Current Location</th>
+                    <th>Pickup Location</th>
+                    <th>Dropoff Location</th>
+                    <th>Cycle Hours</th>
+                    <th>Logs</th>
+                    <th>Map</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trips.map((trip, index) => (
+                    <React.Fragment key={trip.id}>
+                      <tr>
                         <td>{trip.id}</td>
                         <td>{new Date(trip.created_at).toLocaleString()}</td>
                         <td>{trip.current_location.map(x => x.toFixed(4)).join(', ')}</td>
@@ -206,28 +242,49 @@ const AllTrips = ({ onError }) => {
                             {expandedTrip === trip.id ? 'Hide Logs' : 'Show Logs'}
                           </button>
                         </td>
+                        <td>
+                          <button
+                            className="btn btn-sm btn-outline-info"
+                            onClick={() => handleShowMap(trip.id, index)}
+                          >
+                            <FiMap className="me-1" />
+                            {showMapId === trip.id ? 'Hide Map' : 'Show Map'}
+                          </button>
+                        </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {expandedTrip && (
-                <div className="mt-3">
-                  <LogSheet logs={trips.find(trip => trip.id === expandedTrip).logs} />
-                </div>
-              )}
+                      {expandedTrip === trip.id && (
+                        <tr>
+                          <td colSpan="8">
+                            <div className="p-3 bg-light">
+                              <h6>Log Sheets</h6>
+                              <LogSheet logs={trip.logs} />
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      {showMapId === trip.id && (
+                        <tr>
+                          <td colSpan="8">
+                            <div 
+                              id={`trip-map-${trip.id}`} 
+                              style={{ 
+                                height: '400px', 
+                                width: '100%',
+                                borderRadius: '8px',
+                                border: '1px solid #ddd',
+                                margin: '10px 0'
+                              }}
+                            ></div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-
-          <div className="card shadow-sm">
-            <div className="card-header">
-              <h3 className="m-0 font-weight-bold text-primary">All Trip Routes</h3>
-            </div>
-            <div className="card-body p-0">
-              <div id="all-trips-map" style={{ height: '500px', width: '100%' }}></div>
-            </div>
-          </div>
-        </>
+        </div>
       )}
     </div>
   );

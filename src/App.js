@@ -122,7 +122,7 @@ const App = () => {
               title="View trip map"
             >
               <FiMap className="nav-icon" />
-              {isSidebarOpen && <span>Trip Results</span>}
+              {isSidebarOpen && <span>Trip Map</span>}
             </button>
             <button
               className={`nav-link ${activeSection === 'logs' ? 'active' : ''}`}
@@ -131,7 +131,7 @@ const App = () => {
               title="View driver logs"
             >
               <FiClock className="nav-icon" />
-              {isSidebarOpen && <span>Driver Logs</span>}
+              {isSidebarOpen && <span>Trip Logs</span>}
             </button>
             <button
               className={`nav-link ${activeSection === 'all-trips' ? 'active' : ''}`}
@@ -156,7 +156,7 @@ const App = () => {
           <div className="container-fluid py-4">
             {activeSection === 'plan' && (
               <div className="fade-in">
-                <h1 className="display-5 mb-4 text-primary">Plan Your Route</h1>
+                <h1 className="display-5 mb-4 text-primary">Trip Details</h1>
                 <TripForm onSubmit={handleSubmit} loading={isLoading} />
               </div>
             )}

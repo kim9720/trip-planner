@@ -44,3 +44,8 @@ body {
 .fade-in {
   animation: fadeIn 0.5s ease-in;
 }
+
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+}

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { FiInfo } from 'react-icons/fi';
+import React, { useState, useEffect } from 'react';
+import { FiInfo, FiMapPin, FiSearch } from 'react-icons/fi';
+import { OpenStreetMapProvider } from 'leaflet-geosearch';
 
 const TripForm = ({ onSubmit, loading }) => {
   const [formData, setFormData] = useState({
@@ -8,8 +9,107 @@ const TripForm = ({ onSubmit, loading }) => {
     pickup_location: '',
     dropoff_location: '',
     current_cycle_hours: 0,
+    pickup_search: '',
+    dropoff_search: ''
   });
   const [errors, setErrors] = useState({});
+  const [locationError, setLocationError] = useState(null);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [searchResults, setSearchResults] = useState({
+    pickup: [],
+    dropoff: []
+  });
+  const [activeField, setActiveField] = useState(null);
+  const [typingTimeout, setTypingTimeout] = useState(null);
+  
+  const provider = new OpenStreetMapProvider();
+
+  // Debounce search to avoid excessive API calls
+  const handleSearch = async (field, value) => {
+    if (typingTimeout) {
+      clearTimeout(typingTimeout);
+    }
+
+    const timeout = setTimeout(async () => {
+      if (value.length > 2) {
+        try {
+          const results = await provider.search({ query: value });
+          setSearchResults(prev => ({
+            ...prev,
+            [field]: results.slice(0, 5) // Show top 5 results
+          }));
+        } catch (error) {
+          console.error('Search error:', error);
+          setSearchResults(prev => ({
+            ...prev,
+            [field]: []
+          }));
+        }
+      } else {
+        setSearchResults(prev => ({
+          ...prev,
+          [field]: []
+        }));
+      }
+    }, 300); // 300ms debounce delay
+
+    setTypingTimeout(timeout);
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+
+    // Auto-trigger search for location fields
+    if (name === 'pickup_search' || name === 'dropoff_search') {
+      const field = name.split('_')[0];
+      setActiveField(field);
+      handleSearch(field, value);
+    }
+  };
+
+  const selectLocation = (field, result) => {
+    const locationString = `${result.y},${result.x}`;
+    setFormData(prev => ({
+      ...prev,
+      [`${field}_location`]: locationString,
+      [`${field}_search`]: result.label
+    }));
+    setSearchResults(prev => ({
+      ...prev,
+      [field]: [] // Clear results after selection
+    }));
+  };
+
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setIsGettingLocation(true);
+    setLocationError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setFormData(prev => ({
+          ...prev,
+          current_location: `${latitude.toFixed(6)},${longitude.toFixed(6)}`
+        }));
+        setIsGettingLocation(false);
+      },
+      (error) => {
+        setIsGettingLocation(false);
+        setLocationError('Unable to retrieve your location: ' + error.message);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  };
 
   const validate = () => {
     const newErrors = {};
@@ -22,20 +122,16 @@ const TripForm = ({ onSubmit, loading }) => {
       newErrors.current_location = 'Enter valid lat,lng (e.g., 40.7128,-74.0060)';
     }
     if (!latLngRegex.test(formData.pickup_location)) {
-      newErrors.pickup_location = 'Enter valid lat,lng';
+      newErrors.pickup_location = 'Please select a valid pickup location';
     }
     if (!latLngRegex.test(formData.dropoff_location)) {
-      newErrors.dropoff_location = 'Enter valid lat,lng';
+      newErrors.dropoff_location = 'Please select a valid dropoff location';
     }
     if (formData.current_cycle_hours < 0 || formData.current_cycle_hours > 70) {
       newErrors.current_cycle_hours = 'Hours must be between 0 and 70';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = (e) => {
@@ -52,9 +148,18 @@ const TripForm = ({ onSubmit, loading }) => {
     }
   };
 
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeout) {
+        clearTimeout(typingTimeout);
+      }
+    };
+  }, [typingTimeout]);
+
   return (
     <div className="card shadow-lg mx-auto fade-in" style={{ 
-      maxWidth: '500px', 
+      maxWidth: '900px', 
       border: 'none',
       borderRadius: '15px',
       overflow: 'hidden',
@@ -131,108 +236,243 @@ const TripForm = ({ onSubmit, loading }) => {
                 title="Enter latitude and longitude, e.g., 40.7128,-74.0060"
               />
             </label>
-            <input
-              type="text"
-              name="current_location"
-              value={formData.current_location}
-              onChange={handleChange}
-              className={`form-control ${errors.current_location ? 'is-invalid' : ''}`}
-              style={{
-                borderRadius: '8px',
-                padding: '12px 15px',
-                border: '1px solid #dfe6e9',
-                boxShadow: 'none',
-                transition: 'all 0.3s',
-                fontSize: '0.95rem'
-              }}
-              placeholder="e.g., 40.7128,-74.0060"
-              required
-            />
+            <div className="input-group">
+              <input
+                type="text"
+                name="current_location"
+                value={formData.current_location}
+                onChange={handleChange}
+                className={`form-control ${errors.current_location ? 'is-invalid' : ''}`}
+                style={{
+                  borderRadius: '8px 0 0 8px',
+                  padding: '12px 15px',
+                  border: '1px solid #dfe6e9',
+                  boxShadow: 'none',
+                  transition: 'all 0.3s',
+                  fontSize: '0.95rem'
+                }}
+                placeholder="e.g., 40.7128,-74.0060"
+                required
+              />
+              <button
+                type="button"
+                onClick={getCurrentLocation}
+                className="btn btn-outline-secondary"
+                style={{
+                  borderRadius: '0 8px 8px 0',
+                  borderLeft: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 15px',
+                  background: '#f8f9fa'
+                }}
+                disabled={isGettingLocation}
+              >
+                {isGettingLocation ? (
+                  <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                ) : (
+                  <FiMapPin size={18} />
+                )}
+              </button>
+            </div>
             {errors.current_location && (
               <div className="invalid-feedback d-flex align-items-center mt-1">
                 {errors.current_location}
               </div>
             )}
+            {locationError && (
+              <div className="text-danger small mt-1">{locationError}</div>
+            )}
+            <div className="form-text small mt-1">
+              Click the <FiMapPin size={14} className="mx-1" /> icon to use your current location
+            </div>
           </div>
 
-          {/* Pickup Location Field */}
-          <div className="mb-4">
+          {/* Pickup Location Field with Auto-suggest */}
+          <div className="mb-4 position-relative">
             <label className="form-label d-flex align-items-center" style={{
               color: '#34495e',
               fontWeight: '500',
               marginBottom: '0.5rem'
             }}>
-              Pickup Location (lat,lng)
+              Pickup Location
               <FiInfo
                 className="ms-2"
                 size={16}
                 data-bs-toggle="tooltip"
                 data-bs-placement="top"
-                title="Enter latitude and longitude, e.g., 34.0522,-118.2437"
+                title="Search for pickup location"
               />
             </label>
+            <div className="input-group">
+              <input
+                type="text"
+                name="pickup_search"
+                value={formData.pickup_search}
+                onChange={handleChange}
+                onFocus={() => setActiveField('pickup')}
+                className={`form-control ${errors.pickup_location ? 'is-invalid' : ''}`}
+                style={{
+                  borderRadius: '8px 0 0 8px',
+                  padding: '12px 15px',
+                  border: '1px solid #dfe6e9',
+                  boxShadow: 'none',
+                  transition: 'all 0.3s',
+                  fontSize: '0.95rem'
+                }}
+                placeholder="Start typing to search locations..."
+                autoComplete="off"
+              />
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                style={{
+                  borderRadius: '0 8px 8px 0',
+                  borderLeft: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 15px',
+                  background: '#f8f9fa'
+                }}
+                onClick={() => handleSearch('pickup', formData.pickup_search)}
+              >
+                <FiSearch size={18} />
+              </button>
+            </div>
             <input
-              type="text"
+              type="hidden"
               name="pickup_location"
               value={formData.pickup_location}
-              onChange={handleChange}
-              className={`form-control ${errors.pickup_location ? 'is-invalid' : ''}`}
-              style={{
-                borderRadius: '8px',
-                padding: '12px 15px',
-                border: '1px solid #dfe6e9',
-                boxShadow: 'none',
-                transition: 'all 0.3s',
-                fontSize: '0.95rem'
-              }}
-              placeholder="e.g., 34.0522,-118.2437"
-              required
             />
+            {activeField === 'pickup' && searchResults.pickup.length > 0 && (
+              <div className="list-group position-absolute w-100 mt-1" style={{ 
+                zIndex: 1000,
+                maxHeight: '200px',
+                overflowY: 'auto',
+                border: '1px solid #dee2e6',
+                borderRadius: '0 0 8px 8px'
+              }}>
+                {searchResults.pickup.map((result, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    className="list-group-item list-group-item-action text-start"
+                    onClick={() => selectLocation('pickup', result)}
+                    style={{
+                      padding: '10px 15px',
+                      border: 'none',
+                      borderBottom: '1px solid #f8f9fa',
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    {result.label}
+                  </button>
+                ))}
+              </div>
+            )}
             {errors.pickup_location && (
               <div className="invalid-feedback d-flex align-items-center mt-1">
                 {errors.pickup_location}
               </div>
             )}
+            <div className="form-text small mt-1">
+              Search for an address to set pickup location
+            </div>
           </div>
 
-          {/* Dropoff Location Field */}
-          <div className="mb-4">
+          {/* Dropoff Location Field with Auto-suggest */}
+          <div className="mb-4 position-relative">
             <label className="form-label d-flex align-items-center" style={{
               color: '#34495e',
               fontWeight: '500',
               marginBottom: '0.5rem'
             }}>
-              Dropoff Location (lat,lng)
+              Dropoff Location
               <FiInfo
                 className="ms-2"
                 size={16}
                 data-bs-toggle="tooltip"
                 data-bs-placement="top"
-                title="Enter latitude and longitude, e.g., 41.8781,-87.6298"
+                title="Search for dropoff location"
               />
             </label>
+            <div className="input-group">
+              <input
+                type="text"
+                name="dropoff_search"
+                value={formData.dropoff_search}
+                onChange={handleChange}
+                onFocus={() => setActiveField('dropoff')}
+                className={`form-control ${errors.dropoff_location ? 'is-invalid' : ''}`}
+                style={{
+                  borderRadius: '8px 0 0 8px',
+                  padding: '12px 15px',
+                  border: '1px solid #dfe6e9',
+                  boxShadow: 'none',
+                  transition: 'all 0.3s',
+                  fontSize: '0.95rem'
+                }}
+                placeholder="Start typing to search locations..."
+                autoComplete="off"
+              />
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                style={{
+                  borderRadius: '0 8px 8px 0',
+                  borderLeft: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 15px',
+                  background: '#f8f9fa'
+                }}
+                onClick={() => handleSearch('dropoff', formData.dropoff_search)}
+              >
+                <FiSearch size={18} />
+              </button>
+            </div>
             <input
-              type="text"
+              type="hidden"
               name="dropoff_location"
               value={formData.dropoff_location}
-              onChange={handleChange}
-              className={`form-control ${errors.dropoff_location ? 'is-invalid' : ''}`}
-              style={{
-                borderRadius: '8px',
-                padding: '12px 15px',
-                border: '1px solid #dfe6e9',
-                boxShadow: 'none',
-                transition: 'all 0.3s',
-                fontSize: '0.95rem'
-              }}
-              placeholder="e.g., 41.8781,-87.6298"
-              required
             />
+            {activeField === 'dropoff' && searchResults.dropoff.length > 0 && (
+              <div className="list-group position-absolute w-100 mt-1" style={{ 
+                zIndex: 1000,
+                maxHeight: '200px',
+                overflowY: 'auto',
+                border: '1px solid #dee2e6',
+                borderRadius: '0 0 8px 8px'
+              }}>
+                {searchResults.dropoff.map((result, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    className="list-group-item list-group-item-action text-start"
+                    onClick={() => selectLocation('dropoff', result)}
+                    style={{
+                      padding: '10px 15px',
+                      border: 'none',
+                      borderBottom: '1px solid #f8f9fa',
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    {result.label}
+                  </button>
+                ))}
+              </div>
+            )}
             {errors.dropoff_location && (
               <div className="invalid-feedback d-flex align-items-center mt-1">
                 {errors.dropoff_location}
               </div>
             )}
+            <div className="form-text small mt-1">
+              Search for an address to set dropoff location
+            </div>
           </div>
 
           {/* Current Cycle Hours Field */}

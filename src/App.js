@@ -82,7 +82,7 @@ const App = () => {
         <div className="splash-screen">
           <div className="splash-content">
             <FiTruck className="splash-icon" size={64} />
-            <h1 className="splash-title">Trip Planner</h1>
+            <h1 className="splash-title">Driver Trip Logs</h1>
             <div className="spinner-border text-light" role="status">
               <span className="visually-hidden">Loading...</span>
             </div>

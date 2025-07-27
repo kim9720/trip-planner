@@ -106,17 +106,7 @@ const MapDisplay = ({ trip }) => {
       autoRoute: true
     }).addTo(map);
 
-    // Style the route instructions panel
-    const container = L.DomUtil.get('map');
-    if (container) {
-      const routeInstructions = container.querySelector('.leaflet-routing-container');
-      if (routeInstructions) {
-        routeInstructions.style.backgroundColor = 'white';
-        routeInstructions.style.borderRadius = '8px';
-        routeInstructions.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-        routeInstructions.style.padding = '10px';
-      }
-    }
+    
 
     // Add custom legend with better styling
     const legend = L.control({ position: 'bottomright' });

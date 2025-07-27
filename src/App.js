@@ -164,7 +164,7 @@ const App = () => {
             {activeSection === 'results' && tripData && (
               <div className="fade-in">
                 <div className="d-flex justify-content-between align-items-center mb-4">
-                  <h1 className="display-5 m-0 text-primary">Trip Results</h1>
+                  <h1 className="display-5 m-0 text-primary">Trip Map</h1>
                   <button
                     className="btn btn-outline-primary"
                     onClick={() => setActiveSection('plan')}
@@ -179,12 +179,12 @@ const App = () => {
             {activeSection === 'logs' && logs.length > 0 && (
               <div className="fade-in">
                 <div className="d-flex justify-content-between align-items-center mb-4">
-                  <h1 className="display-5 m-0 text-primary">Driver Logs</h1>
+                  <h1 className="display-5 m-0 text-primary">Trip Logs</h1>
                   <button
                     className="btn btn-outline-primary"
                     onClick={() => setActiveSection('results')}
                   >
-                    Back to Results
+                    Back to Map
                   </button>
                 </div>
                 <LogSheet logs={logs} />
